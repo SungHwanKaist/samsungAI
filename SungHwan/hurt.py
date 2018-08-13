@@ -64,16 +64,37 @@ dY_test.to_csv("Y_test.csv", index = False)
 Y_test = pd.read_csv('Y_test.csv', index_col = False)
 
 
+#read data
+data = pd.read_csv('test.csv')
+
+X_predict = np.zeros((11, 105))
+
+for i in range(11):
+    X_predict[i][data['AM/PM'].loc[i]] += 1
+    X_predict[i][2 + data['DAY'].loc[i]] += 1
+    X_predict[i][9 + data['Btype'].loc[i]] += 1
+    X_predict[i][13 + data['Mtype'].loc[i]] += 1
+    X_predict[i][32 + data['Type'].loc[i]] += 1
+    X_predict[i][54 + data['Blaw'].loc[i]] += 1
+    X_predict[i][57 + data['Law'].loc[i]] += 1
+    X_predict[i][77 + data['B1people'].loc[i]] += 1
+    X_predict[i][90 + data['B2people'].loc[i]] += 1
+
+
+dX_predict = pd.DataFrame(X_predict)
+dX_predict.to_csv("X_predict.csv", index = False)
+X_predict = pd.read_csv('X_predict.csv', index_col = False)
+
+
+
 tf_x = tf.placeholder(tf.float32)
 tf_y = tf.placeholder(tf.float32)
 
 # Hidden layers
-hidden_1 = 1000
-hidden_2 = 1000
-hidden_3 = 1000
-hidden_4 = 1000
-hidden_5 = 1000
-hidden_6 = 1000
+hidden_1 = 100
+hidden_2 = 100
+hidden_3 = 100
+hidden_4 = 100
 
 
 # Classes
@@ -101,17 +122,10 @@ def neural_network_model(data):
     b4 = tf.Variable(tf.random_normal([hidden_4]))
     L4 = tf.nn.relu(tf.matmul(L3, W4) + b4)
 
-    W5 = tf.get_variable("W5", shape=[hidden_4, hidden_5], initializer=tf.contrib.layers.xavier_initializer())
-    b5 = tf.Variable(tf.random_normal([hidden_5]))
-    L5 = tf.nn.relu(tf.matmul(L4, W5) + b5)
+    W5 = tf.get_variable("W5", shape=[hidden_4, n_classes], initializer=tf.contrib.layers.xavier_initializer())
+    b5 = tf.Variable(tf.random_normal([n_classes]))
+    output = tf.nn.relu(tf.matmul(L4, W5) + b5)
 
-    W6 = tf.get_variable("W6", shape=[hidden_5, hidden_6], initializer=tf.contrib.layers.xavier_initializer())
-    b6 = tf.Variable(tf.random_normal([hidden_6]))
-    L6 = tf.nn.relu(tf.matmul(L5, W6) + b6)
-
-    W7 = tf.get_variable("W7", shape=[hidden_6, n_classes], initializer=tf.contrib.layers.xavier_initializer())
-    b7 = tf.Variable(tf.random_normal([n_classes]))
-    output = tf.matmul(L6, W7) + b7
 
     return output
 
@@ -119,12 +133,16 @@ def neural_network_model(data):
 def train_network(x):
     # Predict
     prediction = neural_network_model(x)
+
     # Cross-entropy
     cost = tf.reduce_mean(tf.losses.mean_squared_error(labels=tf_y, predictions=prediction)+1e-10)
+
     # Optimizer
     optimizer = tf.train.AdamOptimizer(1e-4).minimize(cost)
     # Model will train for 10 cycles, feed forward + backprop
-    epochs = 5
+    saver = tf.train.Saver()
+
+    epochs = 50
 
     # Session
     with tf.Session() as sess:
@@ -144,10 +162,17 @@ def train_network(x):
                 _, c = sess.run([optimizer, cost], feed_dict={tf_x: epoch_x, tf_y: epoch_y})
                 epoch_loss += c
             print('Epoch', epoch, 'completed out of', epochs, 'loss', epoch_loss)
+            if epoch % 50 == 0:
+                saver.save(sess, './checkpoint/checkpoint_%d' %epoch)
 
         # Check prediction
         subtract = tf.subtract(prediction, tf_y)
-        result = sess.run(subtract, feed_dict={tf_x: X_test, tf_y: Y_test})
+        percent_error = tf.div(subtract, tf.add(tf_y, 0.000001))
+        mean = tf.reduce_mean(percent_error, 0)
+        ##result = sess.run(mean, feed_dict={tf_x: X_test, tf_y: Y_test})
+
+        result = sess.run(prediction, feed_dict={tf_x: X_predict})
+
         print(result)
 
 
